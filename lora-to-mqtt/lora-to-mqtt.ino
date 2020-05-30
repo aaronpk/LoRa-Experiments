@@ -4,9 +4,9 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-#define WIFISSID ""
-#define WIFIPASS ""
-#define MQTTSERVER ""
+#define WIFISSID "launchpad"
+#define WIFIPASS "mitochondria"
+#define MQTTSERVER "10.10.33.33"
 #define MQTTPORT 1883
 #define BAND    915E6
 
@@ -25,30 +25,35 @@ void setup() {
     initWifi();
     initMqtt();
     initDisplay();
+    showWaitingMessage();
 }
 
-void messageLog(String msg, int line=0) {
+void drawMessage(String msg, int line=0) {
     if(line == 0) {
       Heltec.display->clear();
+      Heltec.display->setColor(WHITE);
     }
-    Heltec.display->setColor(WHITE);
     Heltec.display->drawString(0, line*12, msg);
+}
+
+void displayMessage() {
     Heltec.display->display();
-    Serial.println(msg);
 }
 
 void initWifi() {
     WiFiMulti.addAP(WIFISSID, WIFIPASS);
-    messageLog("Connecting to WiFi...");
-    messageLog("SSID: "+String(WIFISSID), 1);
+    drawMessage("Connecting to WiFi...");
+    drawMessage("SSID: "+String(WIFISSID), 1);
+    displayMessage();
 
     int wifiCounter = 0;
     while(WiFiMulti.run() != WL_CONNECTED) {
         delay(500);
     }
 
-    messageLog("Connected to WiFi");
-    messageLog("SSID: "+String(WIFISSID), 1);
+    drawMessage("Connected to WiFi");
+    drawMessage("SSID: "+String(WIFISSID), 1);
+    displayMessage();
     Serial.println(WiFi.localIP());
     delay(1000);
 }
@@ -68,21 +73,23 @@ void initLora() {
   
 }
 
-void clearDisplay() {
-  Heltec.display->clear();
-  Heltec.display->setColor(WHITE);
-  Heltec.display->drawString(0, 0, "Listening...");
-  Heltec.display->display();
+void showWaitingMessage() {
+  drawMessage("Listening for data...");
+  drawMessage("WiFi: "+String(WIFISSID), 1);
+  drawMessage("MQTT: "+String(MQTTSERVER)+":"+String(MQTTPORT), 2);
+  displayMessage();
 }
 
 void mqttReconnect() {
+  Serial.println("Reconnecting to MQTT");
   // Loop until we're reconnected
   while (!mqttClient.connected()) {
-    messageLog("Connecting to MQTT...");
-    messageLog(String(MQTTSERVER)+":"+String(MQTTPORT), 1);
+    drawMessage("Connecting to MQTT...");
+    drawMessage(String(MQTTSERVER)+":"+String(MQTTPORT), 1);
+    displayMessage();
     // Attempt to connect
     if (mqttClient.connect("lora")) {
-      Serial.println("connected");
+      Serial.println("connected to MQTT");
       mqttClient.publish("lora/init", "connected");
     } else {
       Serial.print("failed, rc=");
@@ -92,17 +99,19 @@ void mqttReconnect() {
       delay(5000);
     }
   }
-  messageLog("Connected to MQTT server");
-  messageLog(String(MQTTSERVER)+":"+String(MQTTPORT), 1);
+  drawMessage("Connected to MQTT server");
+  drawMessage(String(MQTTSERVER)+":"+String(MQTTPORT), 1);
+  displayMessage();
 }
 
 char message[256]; // max LoRa packet length
 
-unsigned long receivedTimestamp = millis();
+unsigned long receivedTimestamp = 0;
 
 void loop() {
     if(!mqttClient.connected()) {
       mqttReconnect();
+      showWaitingMessage();
     }
   
     int packetSize = LoRa.parsePacket();
@@ -125,18 +134,20 @@ void loop() {
         // parse the JSON
         DeserializationError err = deserializeJson(packet, message);
         if(err) {
-          messageLog("Packet data was not JSON");
+          drawMessage("Packet data was not JSON");
+          displayMessage();
         } else {
           const char* username = packet["username"].as<char*>();
           const char* device = packet["device"].as<char*>();
           const char* uniqueid = packet["id"].as<char*>();
-          messageLog("username: "+String(username));
-          messageLog("device: "+String(device), 1);
-          messageLog("id: "+String(uniqueid), 2);
+          drawMessage("username: "+String(username));
+          drawMessage("device: "+String(device), 1);
+          drawMessage("id: "+String(uniqueid), 2);
         }
 
-        messageLog("packet length: "+String(packetSize), 3);
-        messageLog("RSSI: "+String(LoRa.packetRssi()), 4);
+        drawMessage("packet length: "+String(packetSize), 3);
+        drawMessage("RSSI: "+String(LoRa.packetRssi()), 4);
+        displayMessage();
         
         delay(50); // delay before turning LED off
         digitalWrite(25, LOW);
@@ -144,7 +155,9 @@ void loop() {
     }
 
     // show the message on the screen for 5 seconds
-    if(millis() > receivedTimestamp + 5000) {
-      clearDisplay();
+    if(receivedTimestamp != 0 && millis() > receivedTimestamp + 5000) {
+      showWaitingMessage();
+      receivedTimestamp = 0;
+      Serial.println("Resetting display");
     }
 }
