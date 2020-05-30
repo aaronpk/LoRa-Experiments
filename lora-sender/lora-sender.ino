@@ -7,32 +7,38 @@
 int counter = 0;
 
 void setup() {
-  
-  //WIFI Kit series V1 not support Vext control
   Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
-  
+
+  Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
+  Heltec.display->setFont(ArialMT_Plain_16);
 }
 
 void loop() {
   Serial.print("Sending packet: ");
   Serial.println(counter);
 
+  digitalWrite(25, HIGH);
+
+  // Show the count on the screen
+  Heltec.display->clear();
+  Heltec.display->setColor(WHITE);
+  Heltec.display->drawString(0, 0, String(USERNAME));
+  Heltec.display->drawString(0, 16, "device: "+String(DEVICE));
+  Heltec.display->drawString(0, 32, "id: "+String(counter));
+  Heltec.display->display();
+
+  // Send the LoRa packet
   LoRa.beginPacket();
-
   LoRa.setTxPower(14, RF_PACONFIG_PASELECT_PABOOST);
-
-  LoRa.print("{\"username\":\"");
-  LoRa.print(USERNAME);
-  LoRa.print("\",\"device\":\"");
-  LoRa.print(DEVICE);
-  LoRa.print("\",\"id\":");
-  LoRa.print(counter);
-  LoRa.print("}");
+  LoRa.print("{\"username\":\""+String(USERNAME)+"\",\"device\":\""+String(DEVICE)+"\",\"id\":\""+String(counter)+"\"}");
   LoRa.endPacket();
-  
+
   counter++;
-  digitalWrite(25, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(1000);                       // wait for a second
-  digitalWrite(25, LOW);    // turn the LED off by making the voltage LOW
-  delay(1000);                       // wait for a second
+
+//  Heltec.display->setColor(BLACK);
+//  Heltec.display->fillRect(112, 16, 8, 8);
+//  Heltec.display->display();
+  digitalWrite(25, LOW);
+  
+  delay(2000);
 }

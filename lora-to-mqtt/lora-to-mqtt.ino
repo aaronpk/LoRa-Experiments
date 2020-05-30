@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 
 #define WIFISSID ""
 #define WIFIPASS ""
@@ -13,6 +14,8 @@ WiFiMulti WiFiMulti;
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
+DynamicJsonDocument packet(1000);
+
 void setup() {
     Serial.begin(115200);
     delay(10);
@@ -21,46 +24,62 @@ void setup() {
     
     initWifi();
     initMqtt();
+    initDisplay();
 }
 
-void messageLog(const char *msg) {
-//    display.clear();
-//    display.setTextAlignment(TEXT_ALIGN_LEFT);
-//    display.setFont(ArialMT_Plain_10);
-//    display.drawString(0, 0, msg);
-//    display.display();
+void messageLog(String msg, int line=0) {
+    if(line == 0) {
+      Heltec.display->clear();
+    }
+    Heltec.display->setColor(WHITE);
+    Heltec.display->drawString(0, line*12, msg);
+    Heltec.display->display();
     Serial.println(msg);
 }
 
 void initWifi() {
     WiFiMulti.addAP(WIFISSID, WIFIPASS);
-    messageLog("Connecting to WiFi... ");
+    messageLog("Connecting to WiFi...");
+    messageLog("SSID: "+String(WIFISSID), 1);
 
+    int wifiCounter = 0;
     while(WiFiMulti.run() != WL_CONNECTED) {
         delay(500);
-        messageLog("Connecting to WiFi... ");
     }
 
-    messageLog("Connected to Wifi");
+    messageLog("Connected to WiFi");
+    messageLog("SSID: "+String(WIFISSID), 1);
     Serial.println(WiFi.localIP());
-    delay(100);
+    delay(1000);
 }
 
 void initMqtt() {
   mqttClient.setServer(MQTTSERVER, MQTTPORT);
   mqttReconnect();
-  messageLog("Connected to MQTT... ");
-  delay(1000);  
+  delay(1000);
+}
+
+void initDisplay() {
+  Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
+  Heltec.display->setFont(ArialMT_Plain_10);
 }
 
 void initLora() {
   
 }
 
+void clearDisplay() {
+  Heltec.display->clear();
+  Heltec.display->setColor(WHITE);
+  Heltec.display->drawString(0, 0, "Listening...");
+  Heltec.display->display();
+}
+
 void mqttReconnect() {
   // Loop until we're reconnected
   while (!mqttClient.connected()) {
-    Serial.print("Attempting MQTT connection...");
+    messageLog("Connecting to MQTT...");
+    messageLog(String(MQTTSERVER)+":"+String(MQTTPORT), 1);
     // Attempt to connect
     if (mqttClient.connect("lora")) {
       Serial.println("connected");
@@ -73,29 +92,59 @@ void mqttReconnect() {
       delay(5000);
     }
   }
+  messageLog("Connected to MQTT server");
+  messageLog(String(MQTTSERVER)+":"+String(MQTTPORT), 1);
 }
 
-char message[4000];
+char message[256]; // max LoRa packet length
+
+unsigned long receivedTimestamp = millis();
 
 void loop() {
     if(!mqttClient.connected()) {
       mqttReconnect();
     }
   
-    // try to parse packet
     int packetSize = LoRa.parsePacket();
-    if (packetSize) {
-        // received a packet
+    if(packetSize) {
+        digitalWrite(25, HIGH);
+
         Serial.print("Received packet '");
-        // read packet
+        // read packet into string
         int i = 0;
-        while (LoRa.available()) {
+        while (LoRa.available() && i <= 255) {
             message[i++] = (char)LoRa.read();
         }
         message[i] = '\0';
+
+        // send to MQTT
         mqttClient.publish("lora/msg", message);
-        Serial.print(message);
-        Serial.print("' with RSSI ");
-        Serial.println(LoRa.packetRssi());
-      }
+
+        Serial.println(String(message)+"' with RSSI "+String(LoRa.packetRssi()));
+
+        // parse the JSON
+        DeserializationError err = deserializeJson(packet, message);
+        if(err) {
+          messageLog("Packet data was not JSON");
+        } else {
+          const char* username = packet["username"].as<char*>();
+          const char* device = packet["device"].as<char*>();
+          const char* uniqueid = packet["id"].as<char*>();
+          messageLog("username: "+String(username));
+          messageLog("device: "+String(device), 1);
+          messageLog("id: "+String(uniqueid), 2);
+        }
+
+        messageLog("packet length: "+String(packetSize), 3);
+        messageLog("RSSI: "+String(LoRa.packetRssi()), 4);
+        
+        delay(50); // delay before turning LED off
+        digitalWrite(25, LOW);
+        receivedTimestamp = millis();
+    }
+
+    // show the message on the screen for 5 seconds
+    if(millis() > receivedTimestamp + 5000) {
+      clearDisplay();
+    }
 }
