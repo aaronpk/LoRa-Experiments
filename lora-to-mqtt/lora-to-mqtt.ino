@@ -20,8 +20,7 @@ void setup() {
     Serial.begin(115200);
     delay(10);
 
-    Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
-    
+    initLora();
     initWifi();
     initMqtt();
     initDisplay();
@@ -40,6 +39,12 @@ void displayMessage() {
     Heltec.display->display();
 }
 
+void initLora() {
+    Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
+    LoRa.setSpreadingFactor(7);
+    LoRa.setSignalBandwidth(125E3);
+}
+
 void initWifi() {
     WiFiMulti.addAP(WIFISSID, WIFIPASS);
     drawMessage("Connecting to WiFi...");
@@ -53,6 +58,7 @@ void initWifi() {
 
     drawMessage("Connected to WiFi");
     drawMessage("SSID: "+String(WIFISSID), 1);
+    drawMessage("IP: "+WiFi.localIP().toString(), 2);
     displayMessage();
     Serial.println(WiFi.localIP());
     delay(1000);
@@ -69,14 +75,11 @@ void initDisplay() {
   Heltec.display->setFont(ArialMT_Plain_10);
 }
 
-void initLora() {
-  
-}
-
 void showWaitingMessage() {
   drawMessage("Listening for data...");
   drawMessage("WiFi: "+String(WIFISSID), 1);
   drawMessage("MQTT: "+String(MQTTSERVER)+":"+String(MQTTPORT), 2);
+  drawMessage("IP: "+WiFi.localIP().toString(), 3);
   displayMessage();
 }
 
