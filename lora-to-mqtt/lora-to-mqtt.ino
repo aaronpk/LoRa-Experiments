@@ -4,11 +4,22 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-#define WIFISSID "launchpad"
-#define WIFIPASS "mitochondria"
+/* wifi credentials */
+#define WIFISSID ""
+#define WIFIPASS ""
+/* point this at your MQTT server */
 #define MQTTSERVER "10.10.33.33"
 #define MQTTPORT 1883
+/* 915E6 is 915Mhz band for the US */
 #define BAND    915E6
+/* identifier for this receiver */
+#define STATIONID ""
+
+/* 
+ * MQTT messages will be formatted as:  
+ * topic: lora/msg/[station]/[rssi]
+ * payload: passthru from receiver, unparsed
+ */
 
 WiFiMulti WiFiMulti;
 WiFiClient wifiClient;
@@ -80,6 +91,7 @@ void showWaitingMessage() {
   drawMessage("WiFi: "+String(WIFISSID), 1);
   drawMessage("MQTT: "+String(MQTTSERVER)+":"+String(MQTTPORT), 2);
   drawMessage("IP: "+WiFi.localIP().toString(), 3);
+  drawMessage("Station: "+String(STATIONID), 4);
   displayMessage();
 }
 
@@ -93,7 +105,10 @@ void mqttReconnect() {
     // Attempt to connect
     if (mqttClient.connect("lora")) {
       Serial.println("connected to MQTT");
-      mqttClient.publish("lora/init", "connected");
+      char mqttkey[100];
+      sprintf(mqttkey, "lora/init/%s", STATIONID);
+      Serial.println("Publishing "+String(mqttkey));      
+      mqttClient.publish(mqttkey, "connected");
     } else {
       Serial.print("failed, rc=");
       Serial.print(mqttClient.state());
@@ -130,7 +145,10 @@ void loop() {
         message[i] = '\0';
 
         // send to MQTT
-        mqttClient.publish("lora/msg", message);
+        char mqttkey[100];
+        sprintf(mqttkey, "lora/msg/%s/%d", STATIONID, LoRa.packetRssi());
+        Serial.println("Publishing "+String(mqttkey));
+        mqttClient.publish(mqttkey, message);
 
         Serial.println(String(message)+"' with RSSI "+String(LoRa.packetRssi()));
 
