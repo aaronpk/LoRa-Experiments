@@ -8,7 +8,7 @@
 #define WIFISSID ""
 #define WIFIPASS ""
 /* point this at your MQTT server */
-#define MQTTSERVER "10.10.33.33"
+#define MQTTSERVER ""
 #define MQTTPORT 1883
 /* 915E6 is 915Mhz band for the US */
 #define BAND    915E6
@@ -52,8 +52,9 @@ void displayMessage() {
 
 void initLora() {
     Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
-    LoRa.setSpreadingFactor(7);
-    LoRa.setSignalBandwidth(125E3);
+    //LoRa.setSpreadingFactor(6);
+    //LoRa.setSignalBandwidth(125E3);
+    //LoRa.enableCrc();
 }
 
 void initWifi() {
@@ -103,7 +104,7 @@ void mqttReconnect() {
     drawMessage(String(MQTTSERVER)+":"+String(MQTTPORT), 1);
     displayMessage();
     // Attempt to connect
-    if (mqttClient.connect("lora")) {
+    if (mqttClient.connect(STATIONID)) {
       Serial.println("connected to MQTT");
       char mqttkey[100];
       sprintf(mqttkey, "lora/init/%s", STATIONID);
@@ -146,7 +147,7 @@ void loop() {
 
         // send to MQTT
         char mqttkey[100];
-        sprintf(mqttkey, "lora/msg/%s/%d", STATIONID, LoRa.packetRssi());
+        sprintf(mqttkey, "lora/msg/%s/%d/%.2f", STATIONID, LoRa.packetRssi(), LoRa.packetSnr());
         Serial.println("Publishing "+String(mqttkey));
         mqttClient.publish(mqttkey, message);
 
@@ -167,7 +168,7 @@ void loop() {
         }
 
         drawMessage("packet length: "+String(packetSize), 3);
-        drawMessage("RSSI: "+String(LoRa.packetRssi()), 4);
+        drawMessage("RSSI: "+String(LoRa.packetRssi())+" SNR:"+String(LoRa.packetSnr()), 4);
         displayMessage();
         
         delay(50); // delay before turning LED off

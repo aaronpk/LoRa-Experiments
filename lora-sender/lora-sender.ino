@@ -8,9 +8,11 @@ int counter = 0;
 
 void setup() {
   Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
-
   Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
   Heltec.display->setFont(ArialMT_Plain_16);
+  //LoRa.setSpreadingFactor(6);
+  LoRa.enableCrc();
+  //LoRa.setSignalBandwidth(125E3);
 }
 
 void loop() {
